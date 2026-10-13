@@ -1,0 +1,1071 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Cruscotto Operazioni — Log Telefonia</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<style>
+  :root {
+    --bg: #0f1117;
+    --surface: #1a1d27;
+    --surface2: #22263a;
+    --border: #2e3250;
+    --accent: #4f7fff;
+    --accent2: #7c5cfc;
+    --ok: #22c55e;
+    --err: #ef4444;
+    --warn: #f59e0b;
+    --neutral: #64748b;
+    --text: #e8eaf6;
+    --text-muted: #8892b0;
+    --font: 'Inter', system-ui, sans-serif;
+  }
+  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap');
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--font);
+    min-height: 100vh;
+  }
+
+  /* ---- HEADER ---- */
+  header {
+    background: var(--surface);
+    border-bottom: 1px solid var(--border);
+    padding: 20px 36px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+    flex-wrap: wrap;
+  }
+  .logo-area h1 {
+    font-size: 1.15rem;
+    font-weight: 600;
+    letter-spacing: -.3px;
+    color: var(--text);
+  }
+  .logo-area p {
+    font-size: .78rem;
+    color: var(--text-muted);
+    margin-top: 2px;
+  }
+  .header-right {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+  #day-select {
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    color: var(--text);
+    font-family: var(--font);
+    font-size: .82rem;
+    padding: 7px 12px;
+    border-radius: 8px;
+    cursor: pointer;
+    outline: none;
+    min-width: 160px;
+  }
+  #day-select:focus { border-color: var(--accent); }
+
+  /* ---- DROP ZONE ---- */
+  #drop-screen {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    min-height: calc(100vh - 70px);
+    gap: 24px;
+    padding: 40px;
+  }
+  .drop-box {
+    border: 2px dashed var(--border);
+    border-radius: 20px;
+    padding: 60px 80px;
+    text-align: center;
+    cursor: pointer;
+    transition: border-color .2s, background .2s;
+    background: var(--surface);
+    max-width: 520px;
+    width: 100%;
+  }
+  .drop-box:hover, .drop-box.over { border-color: var(--accent); background: #1e2340; }
+  .drop-box svg { color: var(--accent); margin-bottom: 16px; }
+  .drop-box h2 { font-size: 1.05rem; font-weight: 600; margin-bottom: 8px; }
+  .drop-box p { font-size: .82rem; color: var(--text-muted); line-height: 1.6; }
+  #file-input { display: none; }
+  .btn-load {
+    margin-top: 18px;
+    display: inline-block;
+    background: var(--accent);
+    color: #fff;
+    font-family: var(--font);
+    font-size: .84rem;
+    font-weight: 500;
+    padding: 10px 24px;
+    border-radius: 8px;
+    border: none;
+    cursor: pointer;
+    transition: opacity .15s;
+  }
+  .btn-load:hover { opacity: .88; }
+  .file-list { margin-top: 14px; font-size: .78rem; color: var(--ok); }
+
+  /* ---- DASHBOARD ---- */
+  #dashboard { display: none; padding: 28px 36px 48px; }
+
+  .kpi-row {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+    gap: 14px;
+    margin-bottom: 28px;
+  }
+  .kpi {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 18px 20px;
+    position: relative;
+    overflow: hidden;
+  }
+  .kpi::before {
+    content: '';
+    position: absolute;
+    top: 0; left: 0; right: 0;
+    height: 3px;
+  }
+  .kpi.blue::before { background: var(--accent); }
+  .kpi.green::before { background: var(--ok); }
+  .kpi.red::before { background: var(--err); }
+  .kpi.yellow::before { background: var(--warn); }
+  .kpi.purple::before { background: var(--accent2); }
+  .kpi-label { font-size: .72rem; color: var(--text-muted); text-transform: uppercase; letter-spacing: .5px; margin-bottom: 6px; }
+  .kpi-value { font-size: 2rem; font-weight: 700; line-height: 1; font-family: 'JetBrains Mono', monospace; }
+  .kpi-sub { font-size: .72rem; color: var(--text-muted); margin-top: 4px; }
+
+  .charts-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 18px;
+    margin-bottom: 18px;
+  }
+  .charts-grid.wide { grid-template-columns: 2fr 1fr; }
+  @media (max-width: 900px) {
+    .charts-grid, .charts-grid.wide { grid-template-columns: 1fr; }
+  }
+
+  .card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 20px 22px;
+  }
+  .card h3 {
+    font-size: .78rem;
+    font-weight: 600;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: .5px;
+    margin-bottom: 16px;
+  }
+  .chart-wrap { position: relative; height: 220px; }
+  .chart-wrap.tall { height: 280px; }
+
+  /* ---- ESITI TABLE ---- */
+  .esiti-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: .8rem;
+  }
+  .esiti-table th {
+    text-align: left;
+    padding: 6px 10px;
+    color: var(--text-muted);
+    font-weight: 500;
+    border-bottom: 1px solid var(--border);
+    font-size: .72rem;
+    text-transform: uppercase;
+    letter-spacing: .4px;
+  }
+  .esiti-table td {
+    padding: 7px 10px;
+    border-bottom: 1px solid #1e2235;
+  }
+  .esiti-table tr:last-child td { border-bottom: none; }
+  .badge {
+    display: inline-block;
+    padding: 2px 8px;
+    border-radius: 4px;
+    font-size: .7rem;
+    font-weight: 600;
+    font-family: 'JetBrains Mono', monospace;
+  }
+  .badge.ok { background: #16351f; color: var(--ok); }
+  .badge.err { background: #351616; color: var(--err); }
+  .badge.warn { background: #352c10; color: var(--warn); }
+  .badge.neutral { background: var(--surface2); color: var(--text-muted); }
+
+  /* ---- TOP TABLE ---- */
+  .top-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: .79rem;
+  }
+  .top-table th {
+    text-align: left;
+    padding: 5px 8px;
+    color: var(--text-muted);
+    font-size: .7rem;
+    text-transform: uppercase;
+    letter-spacing: .4px;
+    border-bottom: 1px solid var(--border);
+  }
+  .top-table td {
+    padding: 6px 8px;
+    border-bottom: 1px solid #1e2235;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: .75rem;
+  }
+  .top-table tr:last-child td { border-bottom: none; }
+  .bar-cell { display: flex; align-items: center; gap: 8px; }
+  .mini-bar { height: 6px; border-radius: 3px; background: var(--accent); min-width: 4px; }
+
+  /* ---- TIMELINE ---- */
+  #no-data { text-align: center; color: var(--text-muted); padding: 40px; font-size: .9rem; }
+
+  .add-more-btn {
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    color: var(--text-muted);
+    font-family: var(--font);
+    font-size: .78rem;
+    padding: 7px 14px;
+    border-radius: 8px;
+    cursor: pointer;
+    transition: border-color .2s, color .2s;
+  }
+  .add-more-btn:hover { border-color: var(--accent); color: var(--text); }
+
+  /* ---- EXPORT SECTION ---- */
+  .export-section {
+    margin-top: 28px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 24px 26px;
+  }
+  .export-section h3 {
+    font-size: .78rem;
+    font-weight: 600;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: .5px;
+    margin-bottom: 18px;
+  }
+  .export-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    gap: 14px;
+  }
+  .export-card {
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 16px 18px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+  .export-card-title {
+    font-size: .84rem;
+    font-weight: 600;
+    color: var(--text);
+  }
+  .export-card-desc {
+    font-size: .74rem;
+    color: var(--text-muted);
+    line-height: 1.5;
+    flex: 1;
+  }
+  .export-card-scope {
+    font-size: .7rem;
+    color: var(--accent);
+    font-family: 'JetBrains Mono', monospace;
+    margin-bottom: 4px;
+  }
+  .btn-export {
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
+    background: var(--accent);
+    color: #fff;
+    font-family: var(--font);
+    font-size: .78rem;
+    font-weight: 500;
+    padding: 8px 16px;
+    border-radius: 7px;
+    border: none;
+    cursor: pointer;
+    transition: opacity .15s;
+    margin-top: 4px;
+    width: fit-content;
+  }
+  .btn-export:hover { opacity: .85; }
+  .btn-export.green { background: #16803a; }
+  .btn-export.purple { background: var(--accent2); }
+  .export-note {
+    font-size: .72rem;
+    color: var(--text-muted);
+    margin-top: 14px;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+</style>
+</head>
+<body>
+
+<!-- HEADER -->
+<header>
+  <div class="logo-area">
+    <h1>Cruscotto Operazioni Telefonia</h1>
+    <p id="header-sub">Carica uno o più file di log per visualizzare il riepilogo</p>
+  </div>
+  <div class="header-right">
+    <select id="day-select" style="display:none">
+      <option value="ALL">Tutti i giorni</option>
+    </select>
+    <button class="add-more-btn" id="add-more-btn" style="display:none" onclick="document.getElementById('file-input').click()">
+      + Aggiungi file
+    </button>
+    <input type="file" id="file-input" multiple accept=".xlsx,.xls">
+  </div>
+</header>
+
+<!-- DROP SCREEN -->
+<div id="drop-screen">
+  <div class="drop-box" id="drop-box">
+    <svg width="44" height="44" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24">
+      <path stroke-linecap="round" stroke-linejoin="round" d="M3 16.5v2.25A2.25 2.25 0 0 0 5.25 21h13.5A2.25 2.25 0 0 0 21 18.75V16.5m-13.5-9L12 3m0 0 4.5 4.5M12 3v13.5"/>
+    </svg>
+    <h2>Trascina qui i file di log</h2>
+    <p>Carica uno o più file <strong>log_operazioni_*.xlsx</strong><br>per visualizzare il cruscotto distribuito per giorno.</p>
+    <button class="btn-load" onclick="document.getElementById('file-input').click()">Seleziona file</button>
+    <div class="file-list" id="file-list"></div>
+  </div>
+</div>
+
+<!-- DASHBOARD -->
+<div id="dashboard">
+  <div class="kpi-row" id="kpi-row"></div>
+
+  <div class="charts-grid wide">
+    <div class="card">
+      <h3>Operazioni nel tempo — andamento orario</h3>
+      <div class="chart-wrap tall"><canvas id="chart-timeline"></canvas></div>
+    </div>
+    <div class="card">
+      <h3>Distribuzione esiti</h3>
+      <div class="chart-wrap tall"><canvas id="chart-esiti-pie"></canvas></div>
+    </div>
+  </div>
+
+  <div class="charts-grid">
+    <div class="card">
+      <h3>Operazioni per tipo</h3>
+      <div class="chart-wrap"><canvas id="chart-ops"></canvas></div>
+    </div>
+    <div class="card">
+      <h3>Operazioni per tecnologia</h3>
+      <div class="chart-wrap"><canvas id="chart-tech"></canvas></div>
+    </div>
+  </div>
+
+  <div class="charts-grid">
+    <div class="card">
+      <h3>Riepilogo esiti</h3>
+      <table class="esiti-table" id="esiti-table">
+        <thead><tr><th>Esito</th><th>Conteggio</th><th>% sul totale</th></tr></thead>
+        <tbody></tbody>
+      </table>
+    </div>
+    <div class="card">
+      <h3>Top 10 numeri per operazioni</h3>
+      <table class="top-table" id="top-table">
+        <thead><tr><th>Numero</th><th>Op.</th><th>Distribuzione</th></tr></thead>
+        <tbody></tbody>
+      </table>
+    </div>
+  </div>
+
+  <div class="charts-grid" style="margin-top:0">
+    <div class="card">
+      <h3>Operatori — operazioni per utente</h3>
+      <div class="chart-wrap"><canvas id="chart-users"></canvas></div>
+    </div>
+    <div class="card">
+      <h3>SGU più attivi</h3>
+      <div class="chart-wrap"><canvas id="chart-sgu"></canvas></div>
+    </div>
+  </div>
+
+  <!-- EXPORT SECTION -->
+  <div class="export-section">
+    <h3>📥 Esporta report Excel</h3>
+    <div class="export-grid">
+
+      <div class="export-card">
+        <div class="export-card-title">Riepilogo per Numero</div>
+        <div class="export-card-scope" id="scope-riepilogo">—</div>
+        <div class="export-card-desc">Una riga per numero telefonico con contatori operazioni, prima/ultima ora, utente, tecnologia, SGU, esito finale e conteggio OK / Errori / Altri esiti.</div>
+        <button class="btn-export" onclick="exportRiepilogo()">
+          <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M3 16.5v2.25A2.25 2.25 0 0 0 5.25 21h13.5A2.25 2.25 0 0 0 21 18.75V16.5M12 3v13.5m0 0-4.5-4.5m4.5 4.5 4.5-4.5"/></svg>
+          Scarica .xlsx
+        </button>
+      </div>
+
+      <div class="export-card">
+        <div class="export-card-title">Dettaglio Operazioni</div>
+        <div class="export-card-scope" id="scope-dettaglio">—</div>
+        <div class="export-card-desc">Tutte le righe del log con data/ora, utente, operazione, tecnologia, SGU, esito e messaggio completo — ordinate per numero telefonico.</div>
+        <button class="btn-export green" onclick="exportDettaglio()">
+          <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M3 16.5v2.25A2.25 2.25 0 0 0 5.25 21h13.5A2.25 2.25 0 0 0 21 18.75V16.5M12 3v13.5m0 0-4.5-4.5m4.5 4.5 4.5-4.5"/></svg>
+          Scarica .xlsx
+        </button>
+      </div>
+
+      <div class="export-card">
+        <div class="export-card-title">Numeriche per Giorno</div>
+        <div class="export-card-scope" id="scope-numeriche">—</div>
+        <div class="export-card-desc">Tabella pivot per giorno: totale operazioni, cessazioni OK, errori, tasso di successo, numeri unici, operazioni per tipo e per tecnologia.</div>
+        <button class="btn-export purple" onclick="exportNumeriche()">
+          <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M3 16.5v2.25A2.25 2.25 0 0 0 5.25 21h13.5A2.25 2.25 0 0 0 21 18.75V16.5M12 3v13.5m0 0-4.5-4.5m4.5 4.5 4.5-4.5"/></svg>
+          Scarica .xlsx
+        </button>
+      </div>
+
+    </div>
+    <div class="export-note">
+      <svg width="13" height="13" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path stroke-linecap="round" d="M12 8v4m0 4h.01"/></svg>
+      L'export rispetta il filtro giorno attivo. "Tutti i giorni" esporta l'intero dataset caricato.
+    </div>
+  </div>
+
+</div>
+
+<script>
+// ---- STATE ----
+let allRows = [];
+let charts = {};
+let loadedFiles = [];
+
+// ---- FILE INPUT ----
+const fileInput = document.getElementById('file-input');
+fileInput.addEventListener('change', e => handleFiles(Array.from(e.target.files)));
+
+const dropBox = document.getElementById('drop-box');
+dropBox.addEventListener('dragover', e => { e.preventDefault(); dropBox.classList.add('over'); });
+dropBox.addEventListener('dragleave', () => dropBox.classList.remove('over'));
+dropBox.addEventListener('drop', e => {
+  e.preventDefault(); dropBox.classList.remove('over');
+  handleFiles(Array.from(e.dataTransfer.files).filter(f => f.name.match(/\.xlsx?$/i)));
+});
+
+function handleFiles(files) {
+  if (!files.length) return;
+  const promises = files.map(f => readXlsx(f));
+  Promise.all(promises).then(results => {
+    results.forEach((rows, i) => {
+      allRows = allRows.concat(rows);
+      loadedFiles.push(files[i].name);
+    });
+    allRows.sort((a, b) => a.ts - b.ts);
+    buildDaySelector();
+    showDashboard();
+    document.getElementById('file-list').textContent = loadedFiles.join(', ');
+  });
+}
+
+function readXlsx(file) {
+  return new Promise((resolve) => {
+    const reader = new FileReader();
+    reader.onload = e => {
+      const wb = XLSX.read(e.target.result, { type: 'array', cellDates: true });
+      const sheetName = wb.SheetNames[0];
+      const rows = XLSX.utils.sheet_to_json(wb.Sheets[sheetName], { defval: '' });
+      const parsed = rows.map(r => {
+        const raw = r['Data esecuzione'];
+        let ts = null;
+        if (raw instanceof Date) ts = raw;
+        else if (typeof raw === 'string') ts = new Date(raw);
+        const day = ts ? ts.toISOString().slice(0, 10) : 'N/A';
+        const hour = ts ? ts.getHours() : -1;
+        return {
+          utente: r['Utente'] || '',
+          ts, day, hour,
+          operazione: r['Operazione'] || '',
+          numero: String(r['Numero Telefono'] || ''),
+          tecnologia: r['Tecnologia'] || '',
+          sgu: r['SGU ID'] || '',
+          esito: r['Esito'] || '',
+          messaggio: r['Messaggio esito'] || ''
+        };
+      }).filter(r => r.ts);
+      resolve(parsed);
+    };
+    reader.readAsArrayBuffer(file);
+  });
+}
+
+// ---- DAY SELECTOR ----
+function buildDaySelector() {
+  const sel = document.getElementById('day-select');
+  const days = [...new Set(allRows.map(r => r.day))].sort();
+  // remove old options except ALL
+  while (sel.options.length > 1) sel.remove(1);
+  days.forEach(d => {
+    const o = document.createElement('option');
+    o.value = d; o.textContent = d;
+    sel.appendChild(o);
+  });
+  sel.style.display = '';
+  sel.onchange = () => renderAll();
+}
+
+// ---- FILTER ----
+function filteredRows() {
+  const day = document.getElementById('day-select').value;
+  return day === 'ALL' ? allRows : allRows.filter(r => r.day === day);
+}
+
+// ---- SHOW DASHBOARD ----
+function showDashboard() {
+  document.getElementById('drop-screen').style.display = 'none';
+  document.getElementById('dashboard').style.display = 'block';
+  document.getElementById('add-more-btn').style.display = '';
+  renderAll();
+}
+
+function renderAll() {
+  const rows = filteredRows();
+  const day = document.getElementById('day-select').value;
+  document.getElementById('header-sub').textContent =
+    day === 'ALL'
+      ? `${loadedFiles.length} file caricati — ${rows.length} operazioni totali`
+      : `Giorno selezionato: ${day} — ${rows.length} operazioni`;
+
+  renderKpi(rows);
+  renderTimeline(rows, day);
+  renderEsitiPie(rows);
+  renderOps(rows);
+  renderTech(rows);
+  renderEsitiTable(rows);
+  renderTopTable(rows);
+  renderUsers(rows);
+  renderSgu(rows);
+  updateExportScopes();
+}
+
+// ---- KPI ----
+function renderKpi(rows) {
+  const total = rows.length;
+  const numeri = new Set(rows.map(r => r.numero)).size;
+  const ok = rows.filter(r => r.esito === 'CESSAZIONE_OK' || r.esito === 'PORTABILITA_OK').length;
+  const err = rows.filter(r => r.esito === 'ERRORE' || r.esito === 'SSH_TIMEOUT').length;
+  const utenti = new Set(rows.map(r => r.utente)).size;
+  const rate = total ? Math.round(ok / rows.filter(r => r.operazione === 'ESEGUI_CESSAZIONE' || r.operazione === 'ESEGUI_PORTABILITA').length * 100) : 0;
+
+  document.getElementById('kpi-row').innerHTML = `
+    <div class="kpi blue"><div class="kpi-label">Operazioni totali</div><div class="kpi-value">${total}</div><div class="kpi-sub">log caricati</div></div>
+    <div class="kpi purple"><div class="kpi-label">Numeri unici</div><div class="kpi-value">${numeri}</div><div class="kpi-sub">numeri telefonici</div></div>
+    <div class="kpi green"><div class="kpi-label">Cessazioni OK</div><div class="kpi-value">${ok}</div><div class="kpi-sub">successo</div></div>
+    <div class="kpi red"><div class="kpi-label">Errori</div><div class="kpi-value">${err}</div><div class="kpi-sub">ERRORE / TIMEOUT</div></div>
+    <div class="kpi yellow"><div class="kpi-label">Tasso successo</div><div class="kpi-value">${isFinite(rate) ? rate : 0}%</div><div class="kpi-sub">su esecuzioni</div></div>
+    <div class="kpi blue"><div class="kpi-label">Operatori</div><div class="kpi-value">${utenti}</div><div class="kpi-sub">utenti attivi</div></div>
+  `;
+}
+
+// ---- TIMELINE ----
+function renderTimeline(rows, dayFilter) {
+  destroyChart('chart-timeline');
+  const ctx = document.getElementById('chart-timeline').getContext('2d');
+
+  let labels, datasets;
+
+  if (dayFilter === 'ALL') {
+    // group by day
+    const byDay = {};
+    rows.forEach(r => { byDay[r.day] = (byDay[r.day] || 0) + 1; });
+    const days = Object.keys(byDay).sort();
+    labels = days;
+    datasets = [{
+      label: 'Operazioni',
+      data: days.map(d => byDay[d]),
+      borderColor: '#4f7fff',
+      backgroundColor: 'rgba(79,127,255,.15)',
+      fill: true,
+      tension: .35,
+      pointRadius: 4,
+    }];
+  } else {
+    // group by hour
+    const byHour = {};
+    for (let h = 0; h < 24; h++) byHour[h] = 0;
+    rows.forEach(r => { if (r.hour >= 0) byHour[r.hour]++; });
+    labels = Object.keys(byHour).map(h => `${String(h).padStart(2,'0')}:00`);
+
+    // split by operazione type
+    const opTypes = [...new Set(rows.map(r => r.operazione))];
+    const colors = ['#4f7fff','#22c55e','#7c5cfc','#f59e0b','#ef4444'];
+    datasets = opTypes.map((op, i) => {
+      const byH = {};
+      for (let h = 0; h < 24; h++) byH[h] = 0;
+      rows.filter(r => r.operazione === op).forEach(r => { if (r.hour >= 0) byH[r.hour]++; });
+      return {
+        label: op.replace(/_/g,' '),
+        data: Object.values(byH),
+        borderColor: colors[i % colors.length],
+        backgroundColor: colors[i % colors.length] + '22',
+        fill: false,
+        tension: .3,
+        pointRadius: 3,
+      };
+    });
+  }
+
+  charts['chart-timeline'] = new Chart(ctx, {
+    type: 'line',
+    data: { labels, datasets },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: { legend: { labels: { color: '#8892b0', font: { size: 11 } } } },
+      scales: {
+        x: { ticks: { color: '#8892b0', font: { size: 10 } }, grid: { color: '#1e2235' } },
+        y: { ticks: { color: '#8892b0', font: { size: 10 } }, grid: { color: '#1e2235' }, beginAtZero: true }
+      }
+    }
+  });
+}
+
+// ---- ESITI PIE ----
+function renderEsitiPie(rows) {
+  destroyChart('chart-esiti-pie');
+  const counts = {};
+  rows.forEach(r => { counts[r.esito] = (counts[r.esito] || 0) + 1; });
+  const sorted = Object.entries(counts).sort((a, b) => b[1] - a[1]);
+  const colorMap = {
+    'CESSAZIONE_OK': '#22c55e', 'PORTABILITA_OK': '#16a34a',
+    'ERRORE': '#ef4444', 'SSH_TIMEOUT': '#dc2626',
+    'GIA_PORTATA': '#4f7fff', 'TROVATA': '#7c5cfc',
+    'ARCO_MIGRATO_SNODO': '#f59e0b', 'VOIP_NON_GESTIBILE': '#94a3b8',
+    'DA_PORTARE_SENZA_EN': '#fb923c',
+  };
+  const palette = ['#4f7fff','#7c5cfc','#22c55e','#f59e0b','#ef4444','#06b6d4','#ec4899','#84cc16','#94a3b8','#fb923c'];
+
+  const ctx = document.getElementById('chart-esiti-pie').getContext('2d');
+  charts['chart-esiti-pie'] = new Chart(ctx, {
+    type: 'doughnut',
+    data: {
+      labels: sorted.map(([k]) => k.replace(/_/g,' ')),
+      datasets: [{
+        data: sorted.map(([,v]) => v),
+        backgroundColor: sorted.map(([k], i) => colorMap[k] || palette[i % palette.length]),
+        borderColor: '#1a1d27', borderWidth: 2
+      }]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: {
+        legend: { position: 'right', labels: { color: '#8892b0', font: { size: 10 }, boxWidth: 12, padding: 8 } }
+      }
+    }
+  });
+}
+
+// ---- OPS BAR ----
+function renderOps(rows) {
+  destroyChart('chart-ops');
+  const counts = {};
+  rows.forEach(r => { counts[r.operazione] = (counts[r.operazione] || 0) + 1; });
+  const sorted = Object.entries(counts).sort((a,b) => b[1]-a[1]);
+  const ctx = document.getElementById('chart-ops').getContext('2d');
+  charts['chart-ops'] = new Chart(ctx, {
+    type: 'bar',
+    data: {
+      labels: sorted.map(([k]) => k.replace(/_/g,' ')),
+      datasets: [{ label: 'Operazioni', data: sorted.map(([,v]) => v),
+        backgroundColor: ['#4f7fff','#7c5cfc','#22c55e','#f59e0b','#ef4444'],
+        borderRadius: 6 }]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false, indexAxis: 'y',
+      plugins: { legend: { display: false } },
+      scales: {
+        x: { ticks: { color: '#8892b0', font: { size: 10 } }, grid: { color: '#1e2235' }, beginAtZero: true },
+        y: { ticks: { color: '#e8eaf6', font: { size: 10 } }, grid: { display: false } }
+      }
+    }
+  });
+}
+
+// ---- TECH BAR ----
+function renderTech(rows) {
+  destroyChart('chart-tech');
+  const counts = {};
+  rows.forEach(r => { if (r.tecnologia) counts[r.tecnologia] = (counts[r.tecnologia] || 0) + 1; });
+  const sorted = Object.entries(counts).sort((a,b) => b[1]-a[1]);
+  const ctx = document.getElementById('chart-tech').getContext('2d');
+  charts['chart-tech'] = new Chart(ctx, {
+    type: 'bar',
+    data: {
+      labels: sorted.map(([k]) => k),
+      datasets: [{ label: 'Operazioni', data: sorted.map(([,v]) => v),
+        backgroundColor: ['#7c5cfc','#4f7fff','#22c55e','#f59e0b'],
+        borderRadius: 6 }]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: { legend: { display: false } },
+      scales: {
+        x: { ticks: { color: '#e8eaf6', font: { size: 11 } }, grid: { display: false } },
+        y: { ticks: { color: '#8892b0', font: { size: 10 } }, grid: { color: '#1e2235' }, beginAtZero: true }
+      }
+    }
+  });
+}
+
+// ---- ESITI TABLE ----
+function renderEsitiTable(rows) {
+  const counts = {};
+  rows.forEach(r => { counts[r.esito] = (counts[r.esito] || 0) + 1; });
+  const total = rows.length;
+  const sorted = Object.entries(counts).sort((a,b) => b[1]-a[1]);
+  const tbody = document.querySelector('#esiti-table tbody');
+  tbody.innerHTML = sorted.map(([esito, n]) => {
+    let cls = 'neutral';
+    if (esito === 'CESSAZIONE_OK' || esito === 'PORTABILITA_OK') cls = 'ok';
+    else if (esito === 'ERRORE' || esito === 'SSH_TIMEOUT') cls = 'err';
+    else if (esito === 'ARCO_MIGRATO_SNODO' || esito === 'VOIP_NON_GESTIBILE' || esito === 'DA_PORTARE_SENZA_EN') cls = 'warn';
+    return `<tr>
+      <td><span class="badge ${cls}">${esito.replace(/_/g,' ')}</span></td>
+      <td style="font-family:'JetBrains Mono',monospace">${n}</td>
+      <td style="color:var(--text-muted)">${(n/total*100).toFixed(1)}%</td>
+    </tr>`;
+  }).join('');
+}
+
+// ---- TOP TABLE ----
+function renderTopTable(rows) {
+  const counts = {};
+  rows.forEach(r => { counts[r.numero] = (counts[r.numero] || 0) + 1; });
+  const sorted = Object.entries(counts).sort((a,b) => b[1]-a[1]).slice(0,10);
+  const max = sorted[0]?.[1] || 1;
+  const tbody = document.querySelector('#top-table tbody');
+  tbody.innerHTML = sorted.map(([num, n]) => {
+    const pct = Math.round(n/max*100);
+    return `<tr>
+      <td>${num}</td>
+      <td>${n}</td>
+      <td><div class="bar-cell"><div class="mini-bar" style="width:${Math.max(pct,4)}px"></div><span style="color:var(--text-muted);font-size:.68rem">${n}</span></div></td>
+    </tr>`;
+  }).join('');
+}
+
+// ---- USERS ----
+function renderUsers(rows) {
+  destroyChart('chart-users');
+  const counts = {};
+  rows.forEach(r => { if (r.utente) counts[r.utente] = (counts[r.utente] || 0) + 1; });
+  const sorted = Object.entries(counts).sort((a,b) => b[1]-a[1]);
+  const ctx = document.getElementById('chart-users').getContext('2d');
+  charts['chart-users'] = new Chart(ctx, {
+    type: 'bar',
+    data: {
+      labels: sorted.map(([k]) => k),
+      datasets: [{ label: 'Op.', data: sorted.map(([,v]) => v),
+        backgroundColor: sorted.map((_,i) => ['#4f7fff','#7c5cfc','#22c55e','#f59e0b'][i%4]),
+        borderRadius: 6 }]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false, indexAxis: 'y',
+      plugins: { legend: { display: false } },
+      scales: {
+        x: { ticks: { color: '#8892b0', font: { size: 10 } }, grid: { color: '#1e2235' }, beginAtZero: true },
+        y: { ticks: { color: '#e8eaf6', font: { size: 10 } }, grid: { display: false } }
+      }
+    }
+  });
+}
+
+// ---- SGU ----
+function renderSgu(rows) {
+  destroyChart('chart-sgu');
+  const counts = {};
+  rows.forEach(r => { if (r.sgu) counts[r.sgu] = (counts[r.sgu] || 0) + 1; });
+  const sorted = Object.entries(counts).sort((a,b) => b[1]-a[1]).slice(0,10);
+  const ctx = document.getElementById('chart-sgu').getContext('2d');
+  charts['chart-sgu'] = new Chart(ctx, {
+    type: 'bar',
+    data: {
+      labels: sorted.map(([k]) => k),
+      datasets: [{ label: 'Op.', data: sorted.map(([,v]) => v),
+        backgroundColor: '#22c55e66', borderColor: '#22c55e', borderWidth: 1,
+        borderRadius: 5 }]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false, indexAxis: 'y',
+      plugins: { legend: { display: false } },
+      scales: {
+        x: { ticks: { color: '#8892b0', font: { size: 10 } }, grid: { color: '#1e2235' }, beginAtZero: true },
+        y: { ticks: { color: '#e8eaf6', font: { size: 9 } }, grid: { display: false } }
+      }
+    }
+  });
+}
+
+function destroyChart(id) {
+  if (charts[id]) { charts[id].destroy(); delete charts[id]; }
+}
+
+// ---- UPDATE EXPORT SCOPE LABELS ----
+function updateExportScopes() {
+  const day = document.getElementById('day-select').value;
+  const rows = filteredRows();
+  const label = day === 'ALL' ? `Tutti i giorni (${rows.length} righe)` : `${day} (${rows.length} righe)`;
+  document.getElementById('scope-riepilogo').textContent = label;
+  document.getElementById('scope-dettaglio').textContent = label;
+  document.getElementById('scope-numeriche').textContent = label;
+}
+
+// ---- XLSX HELPERS ----
+const HDR_STYLE = { font: { bold: true, color: { rgb: 'FFFFFF' }, name: 'Arial', sz: 10 },
+  fill: { fgColor: { rgb: '1F4E79' } },
+  alignment: { horizontal: 'center', vertical: 'center', wrapText: true },
+  border: { top:{style:'thin',color:{rgb:'BBBBBB'}}, bottom:{style:'thin',color:{rgb:'BBBBBB'}},
+            left:{style:'thin',color:{rgb:'BBBBBB'}}, right:{style:'thin',color:{rgb:'BBBBBB'}} } };
+const CELL_STYLE = { font: { name: 'Arial', sz: 9 },
+  border: { top:{style:'thin',color:{rgb:'DDDDDD'}}, bottom:{style:'thin',color:{rgb:'DDDDDD'}},
+            left:{style:'thin',color:{rgb:'DDDDDD'}}, right:{style:'thin',color:{rgb:'DDDDDD'}} } };
+
+const FILL_OK   = { fgColor: { rgb: 'C6EFCE' } };
+const FILL_ERR  = { fgColor: { rgb: 'FFC7CE' } };
+const FILL_WARN = { fgColor: { rgb: 'FFEB9C' } };
+const FILL_ALT  = { fgColor: { rgb: 'DDEBF7' } };
+
+function esitoFill(esito) {
+  if (['CESSAZIONE_OK','PORTABILITA_OK'].includes(esito)) return FILL_OK;
+  if (['ERRORE','SSH_TIMEOUT'].includes(esito))           return FILL_ERR;
+  if (['ARCO_MIGRATO_SNODO','VOIP_NON_GESTIBILE','DA_PORTARE_SENZA_EN'].includes(esito)) return FILL_WARN;
+  return FILL_ALT;
+}
+
+function setCellStyle(ws, addr, style) {
+  if (!ws[addr]) return;
+  ws[addr].s = style;
+}
+
+function colWidth(n) { return { wch: n }; }
+
+function downloadWb(wb, filename) {
+  XLSX.writeFile(wb, filename, { bookType: 'xlsx', type: 'binary', cellStyles: true });
+}
+
+// ---- EXPORT 1: RIEPILOGO PER NUMERO ----
+function exportRiepilogo() {
+  const rows = filteredRows();
+  const day  = document.getElementById('day-select').value;
+
+  // Build summary map
+  const map = {};
+  rows.forEach(r => {
+    if (!map[r.numero]) map[r.numero] = { ops: [], utenti: new Set(), tecnologie: new Set(), sgus: new Set() };
+    map[r.numero].ops.push(r);
+    if (r.utente) map[r.numero].utenti.add(r.utente);
+    if (r.tecnologia) map[r.numero].tecnologie.add(r.tecnologia);
+    if (r.sgu) map[r.numero].sgus.add(r.sgu);
+  });
+
+  const headers = ['Numero Telefono','Num. Operazioni','Prima operazione','Ultima operazione',
+    'Utente(i)','Tecnologia','SGU ID','Esito finale','OK','Errori','Altri esiti'];
+
+  const data = [headers];
+  Object.entries(map).sort(([a],[b]) => a.localeCompare(b)).forEach(([num, m]) => {
+    const ops = m.ops.sort((a,b) => a.ts - b.ts);
+    const last = ops[ops.length-1];
+    const ok  = ops.filter(o => ['CESSAZIONE_OK','PORTABILITA_OK'].includes(o.esito)).length;
+    const err = ops.filter(o => ['ERRORE','SSH_TIMEOUT'].includes(o.esito)).length;
+    const alt = ops.length - ok - err;
+    data.push([
+      num, ops.length,
+      ops[0].ts.toLocaleTimeString('it-IT'),
+      last.ts.toLocaleTimeString('it-IT'),
+      [...m.utenti].sort().join(', '),
+      [...m.tecnologie].sort().join(', '),
+      [...m.sgus].sort().join(', '),
+      last.esito, ok, err, alt
+    ]);
+  });
+
+  const ws = XLSX.utils.aoa_to_sheet(data);
+  ws['!cols'] = [16,12,12,12,22,12,22,22,6,7,10].map(colWidth);
+  ws['!rows'] = [{ hpt: 28 }];
+
+  // Style header row
+  headers.forEach((_, ci) => {
+    const addr = XLSX.utils.encode_cell({ r: 0, c: ci });
+    setCellStyle(ws, addr, HDR_STYLE);
+  });
+
+  // Style data rows
+  data.slice(1).forEach((row, ri) => {
+    const esito = row[7];
+    const fill  = esitoFill(esito);
+    row.forEach((_, ci) => {
+      const addr = XLSX.utils.encode_cell({ r: ri+1, c: ci });
+      if (!ws[addr]) return;
+      const s = { ...CELL_STYLE, alignment: { horizontal: 'center', vertical: 'center' } };
+      if (ci === 7) s.fill = fill;  // esito finale column only
+      ws[addr].s = s;
+    });
+  });
+
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, 'Riepilogo per Numero');
+  const suffix = day === 'ALL' ? 'tutti' : day;
+  downloadWb(wb, `report_riepilogo_${suffix}.xlsx`);
+}
+
+// ---- EXPORT 2: DETTAGLIO ----
+function exportDettaglio() {
+  const rows = filteredRows();
+  const day  = document.getElementById('day-select').value;
+
+  const headers = ['Numero Telefono','Data','Ora','Utente','Operazione','Tecnologia','SGU ID','Esito','Messaggio esito'];
+  const sorted  = [...rows].sort((a,b) => a.numero.localeCompare(b.numero) || a.ts - b.ts);
+
+  const data = [headers, ...sorted.map(r => [
+    r.numero,
+    r.ts.toLocaleDateString('it-IT'),
+    r.ts.toLocaleTimeString('it-IT'),
+    r.utente, r.operazione, r.tecnologia, r.sgu, r.esito, r.messaggio
+  ])];
+
+  const ws = XLSX.utils.aoa_to_sheet(data);
+  ws['!cols'] = [16,11,10,10,20,12,18,22,60].map(colWidth);
+  ws['!rows'] = [{ hpt: 28 }];
+
+  headers.forEach((_, ci) => {
+    const addr = XLSX.utils.encode_cell({ r: 0, c: ci });
+    setCellStyle(ws, addr, HDR_STYLE);
+  });
+
+  sorted.forEach((r, ri) => {
+    const fill = esitoFill(r.esito);
+    [0, 7].forEach(ci => {   // color Numero and Esito columns
+      const addr = XLSX.utils.encode_cell({ r: ri+1, c: ci });
+      if (ws[addr]) ws[addr].s = { ...CELL_STYLE, fill, alignment: { vertical: 'center' } };
+    });
+    // style remaining cells
+    [1,2,3,4,5,6,8].forEach(ci => {
+      const addr = XLSX.utils.encode_cell({ r: ri+1, c: ci });
+      if (ws[addr]) ws[addr].s = { ...CELL_STYLE, alignment: { vertical: 'center', wrapText: ci===8 } };
+    });
+  });
+
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, 'Dettaglio Operazioni');
+  const suffix = day === 'ALL' ? 'tutti' : day;
+  downloadWb(wb, `report_dettaglio_${suffix}.xlsx`);
+}
+
+// ---- EXPORT 3: NUMERICHE PER GIORNO ----
+function exportNumeriche() {
+  const rows = filteredRows();
+  const day  = document.getElementById('day-select').value;
+
+  // Collect all unique op types and technologies for dynamic columns
+  const allOps  = [...new Set(rows.map(r => r.operazione))].sort();
+  const allTech = [...new Set(rows.map(r => r.tecnologia).filter(Boolean))].sort();
+
+  const headers = [
+    'Giorno', 'Tot. Operazioni', 'Numeri Unici', 'Operatori Attivi',
+    'Cessazioni OK', 'Errori', 'Tasso Successo %',
+    ...allOps.map(o => `Op: ${o}`),
+    ...allTech.map(t => `Tech: ${t}`)
+  ];
+
+  // Group by day
+  const byDay = {};
+  rows.forEach(r => {
+    if (!byDay[r.day]) byDay[r.day] = [];
+    byDay[r.day].push(r);
+  });
+
+  const dataRows = Object.entries(byDay).sort(([a],[b]) => a.localeCompare(b)).map(([d, dr]) => {
+    const numeri   = new Set(dr.map(r => r.numero)).size;
+    const utenti   = new Set(dr.map(r => r.utente)).size;
+    const ok       = dr.filter(r => ['CESSAZIONE_OK','PORTABILITA_OK'].includes(r.esito)).length;
+    const err      = dr.filter(r => ['ERRORE','SSH_TIMEOUT'].includes(r.esito)).length;
+    const execs    = dr.filter(r => r.operazione.startsWith('ESEGUI_')).length;
+    const tasso    = execs ? +(ok/execs*100).toFixed(1) : 0;
+    const opCounts = allOps.map(op => dr.filter(r => r.operazione === op).length);
+    const techCounts = allTech.map(t => dr.filter(r => r.tecnologia === t).length);
+    return [d, dr.length, numeri, utenti, ok, err, tasso, ...opCounts, ...techCounts];
+  });
+
+  // Totals row
+  if (dataRows.length > 1) {
+    const tot = (ci) => dataRows.reduce((s, r) => s + (typeof r[ci] === 'number' ? r[ci] : 0), 0);
+    const totOk  = tot(4), totExec = dataRows.reduce((s,r) => {
+      const dr = byDay[r[0]]; return s + (dr ? dr.filter(r2=>r2.operazione.startsWith('ESEGUI_')).length : 0);
+    }, 0);
+    const tassoTot = totExec ? +(totOk/totExec*100).toFixed(1) : 0;
+    dataRows.push(['TOTALE', tot(1), '—', '—', totOk, tot(5), tassoTot,
+      ...allOps.map((_,i) => tot(7+i)),
+      ...allTech.map((_,i) => tot(7+allOps.length+i))
+    ]);
+  }
+
+  const data = [headers, ...dataRows];
+  const ws = XLSX.utils.aoa_to_sheet(data);
+  ws['!cols'] = [12, 14, 12, 14, 14, 8, 14,
+    ...allOps.map(() => ({ wch: 18 })),
+    ...allTech.map(() => ({ wch: 14 }))
+  ];
+  ws['!rows'] = [{ hpt: 30 }];
+
+  // Header style
+  headers.forEach((_, ci) => {
+    const addr = XLSX.utils.encode_cell({ r: 0, c: ci });
+    setCellStyle(ws, addr, HDR_STYLE);
+  });
+
+  // Data style: color Tasso Successo and totals row
+  dataRows.forEach((row, ri) => {
+    const isTotale = row[0] === 'TOTALE';
+    row.forEach((val, ci) => {
+      const addr = XLSX.utils.encode_cell({ r: ri+1, c: ci });
+      if (!ws[addr]) return;
+      let s = { ...CELL_STYLE, alignment: { horizontal: ci === 0 ? 'left' : 'center', vertical: 'center' } };
+      if (isTotale) s.font = { ...s.font, bold: true };
+      if (ci === 6 && typeof val === 'number') {  // Tasso Successo
+        s.fill = val >= 80 ? FILL_OK : val >= 50 ? FILL_WARN : FILL_ERR;
+      }
+      ws[addr].s = s;
+    });
+  });
+
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, 'Numeriche per Giorno');
+  const suffix = day === 'ALL' ? 'tutti' : day;
+  downloadWb(wb, `report_numeriche_${suffix}.xlsx`);
+}
+</script>
+</body>
+</html>
