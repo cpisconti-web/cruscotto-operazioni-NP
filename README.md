@@ -1,0 +1,1 @@
+# cruscotto-operazioni-NP
